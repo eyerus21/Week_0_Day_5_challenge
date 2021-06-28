@@ -1,4 +1,4 @@
-from hello import barChart
+#from hello import barChart
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -10,7 +10,7 @@ from Adding_Data import db_execute_fetch
 
 
 
-#st.set_page_config(page_title="Topic Analysis and Sentiment Analysis", layout="wide")
+st.set_page_config(page_title="Topic Analysis and Sentiment Analysis", layout="wide")
 
 def loadData():
     query = "select * from Twitter"
@@ -20,7 +20,7 @@ def loadData():
 
 def select_original_author():
     df = loadData()
-    Author= st.sidebar.multiselect("Choose an Author", list(df['original_author'].unique()))
+    Author= st.sidebar.multiselect("Choose Authors", list(df['original_author'].unique()))
     if Author:
         df = df[np.isin(df, Author).any(axis=1)]
         st.write(df)
@@ -56,7 +56,7 @@ def wordCloud():
 
         cleanText += " ".join(tokens) + " "
 
-    wc = WordCloud(width=650, height=450, background_color='lightpink', min_font_size=5).generate(cleanText)
+    wc = WordCloud(width=850, height=650, background_color='lightpink', min_font_size=5).generate(cleanText)
     st.title("Tweet Text Word Cloud")
     st.image(wc.to_array())   
     
@@ -113,11 +113,17 @@ def  Original_AuthPie():
         
         
 st.title("Data Display")
+st.write('Table for selected Authors including the details')
 select_original_author()
+st.write('Table for selected Locations and polarity including the details')
 selectLocAndPola()
 
 st.title("Data Visualizations")
-wordCloud()
-with st.beta_expander("Show More Graphs"):
+random_tweet = st.selectbox('Visualizations', 
+                ('Topic Modeling','Bar Chart','Pie Chart'))
+if random_tweet == 'Topic Modeling':
+    wordCloud()
+elif random_tweet == 'Bar Chart':
     PolarityBarChart()
+elif random_tweet == 'Pie Chart':
     Original_AuthPie()
