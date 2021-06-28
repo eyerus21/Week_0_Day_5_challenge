@@ -1,81 +1,105 @@
+from hello import barChart
+import streamlit as st
 import numpy as np
 import pandas as pd
-import streamlit as st
 import altair as alt
 from wordcloud import WordCloud
 import plotly.express as px
-from add_data import db_execute_fetch
+from Adding_Data import db_execute_fetch
 
-st.set_page_config(page_title="Day 5", layout="wide")
+
+
+
+#st.set_page_config(page_title="Topic Analysis and Sentiment Analysis", layout="wide")
 
 def loadData():
-    query = "select * from TweetInformation"
+    query = "select * from Twitter"
     df = db_execute_fetch(query, dbName="tweets", rdf=True)
     return df
 
-def selectHashTag():
+
+def select_original_author():
     df = loadData()
-    hashTags = st.multiselect("choose combaniation of hashtags", list(df['hashtags'].unique()))
-    if hashTags:
-        df = df[np.isin(df, hashTags).any(axis=1)]
+    Author= st.sidebar.multiselect("Choose an Author", list(df['original_author'].unique()))
+    if Author:
+        df = df[np.isin(df, Author).any(axis=1)]
         st.write(df)
-
-def selectLocAndAuth():
+        
+        
+def selectLocAndPola():
     df = loadData()
-    location = st.multiselect("choose Location of tweets", list(df['place_coordinate'].unique()))
-    lang = st.multiselect("choose Language of tweets", list(df['language'].unique()))
+    df['score'] = df['polarity'].apply(text_category) 
+    location = st.sidebar.multiselect("choose Location of tweets", list(df['place'].unique()))
+    Polarity = st.sidebar.multiselect("choose Polarity of tweets", list(df['score']))
 
-    if location and not lang:
+    if location and not Polarity:
         df = df[np.isin(df, location).any(axis=1)]
         st.write(df)
-    elif lang and not location:
-        df = df[np.isin(df, lang).any(axis=1)]
+    elif Polarity and not location:
+        df = df[np.isin(df, Polarity).any(axis=1)]
         st.write(df)
-    elif lang and location:
-        location.extend(lang)
+    elif Polarity and location:
+        location.extend(Polarity)
         df = df[np.isin(df, location).any(axis=1)]
         st.write(df)
     else:
         st.write(df)
-
-def barChart(data, title, X, Y):
-    title = title.title()
-    st.title(f'{title} Chart')
-    msgChart = (alt.Chart(data).mark_bar().encode(alt.X(f"{X}:N", sort=alt.EncodingSortField(field=f"{Y}", op="values",
-                order='ascending')), y=f"{Y}:Q"))
-    st.altair_chart(msgChart, use_container_width=True)
-
+        
+  
+        
+        
 def wordCloud():
     df = loadData()
     cleanText = ''
-    for text in df['clean_text']:
+    for text in df['original_text']:
         tokens = str(text).lower().split()
 
         cleanText += " ".join(tokens) + " "
 
-    wc = WordCloud(width=650, height=450, background_color='white', min_font_size=5).generate(cleanText)
+    wc = WordCloud(width=650, height=450, background_color='lightpink', min_font_size=5).generate(cleanText)
     st.title("Tweet Text Word Cloud")
-    st.image(wc.to_array())
+    st.image(wc.to_array())   
+    
+    
+def text_category(p):
+    """
+    A function  that takes a value p and returns, depending on the value of p, 
+    a string 'positive', 'negative' or 'neutral'
+    """
+    if p > 0 : return 'positive'
+    elif p == 0: return 'neutral'
+    return 'negative'
 
-def stBarChart():
+# Count the number of positive, neutral, and negative
+def polarity_count():
     df = loadData()
-    dfCount = pd.DataFrame({'Tweet_count': df.groupby(['original_author'])['clean_text'].count()}).reset_index()
-    dfCount["original_author"] = dfCount["original_author"].astype(str)
-    dfCount = dfCount.sort_values("Tweet_count", ascending=False)
+    df['score'] = df['polarity'].apply(text_category) 
+    x= list(df['score'])
+    return { 'positive': x.count('positive'), 'neutral': x.count('neutral'),
+                            'negative': x.count('negative')  } 
 
-    num = st.slider("Select number of Rankings", 0, 50, 5)
-    title = f"Top {num} Ranking By Number of tweets"
-    barChart(dfCount.head(num), title, "original_author", "Tweet_count")
+    
+    
+def PolarityBarChart():
+   
+    st.title('Polarity BarChart')
+    pol=polarity_count()
+    pol_data= pd.DataFrame({
+        'labels':list(pol.keys()), 
+        'data':list(pol.values())})
+    Bchart=px.bar(pol_data,x='labels', y='data')
+    st.plotly_chart(Bchart)
+    
 
-
-def langPie():
+def  Original_AuthPie():
+    
     df = loadData()
-    dfLangCount = pd.DataFrame({'Tweet_count': df.groupby(['language'])['clean_text'].count()}).reset_index()
-    dfLangCount["language"] = dfLangCount["language"].astype(str)
-    dfLangCount = dfLangCount.sort_values("Tweet_count", ascending=False)
-    dfLangCount.loc[dfLangCount['Tweet_count'] < 10, 'lang'] = 'Other languages'
-    st.title(" Tweets Language pie chart")
-    fig = px.pie(dfLangCount, values='Tweet_count', names='language', width=500, height=350)
+    dfAuthCount = pd.DataFrame({'Tweet_count': df.groupby(['original_author'])['original_text'].count()}).reset_index()
+    dfAuthCount[""] = dfAuthCount["original_author"].astype(str)
+    dfAuthCount = dfAuthCount.sort_values("Tweet_count", ascending=False)
+    dfAuthCount.loc[dfAuthCount['Tweet_count'] < 10, 'original_author'] = 'Other Authors'
+    st.title(" Tweets Author pie chart")
+    fig = px.pie(dfAuthCount, values='Tweet_count', names='original_author', width=500, height=350)
     fig.update_traces(textposition='inside', textinfo='percent+label')
 
     colB1, colB2 = st.beta_columns([2.5, 1])
@@ -83,15 +107,17 @@ def langPie():
     with colB1:
         st.plotly_chart(fig)
     with colB2:
-        st.write(dfLangCount)
-
-
+        st.write(dfAuthCount)       
+        
+        
+        
+        
 st.title("Data Display")
-selectHashTag()
-st.markdown("<p style='padding:10px; background-color:#000000;color:#00ECB9;font-size:16px;border-radius:10px;'>Section Break</p>", unsafe_allow_html=True)
-selectLocAndAuth()
+select_original_author()
+selectLocAndPola()
+
 st.title("Data Visualizations")
 wordCloud()
 with st.beta_expander("Show More Graphs"):
-    stBarChart()
-    langPie()
+    PolarityBarChart()
+    Original_AuthPie()
